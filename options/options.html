@@ -9,20 +9,100 @@
 
 <body>
   <div class="item">
+    <label for="enable-up-card">开启up主卡片:</label>
+    <input type="checkbox" id="enable-up-card">
+  </div>
+  <div class="item">
+    <label for="enable-block-button">开启拉黑键:</label>
+    <input type="checkbox" id="enable-block-button">
+  </div>
+  <div class="item">
+    <label for="enable-rollback-feedcard">开启首页换一换的前进后退:</label>
+    <input type="checkbox" id="enable-rollback-feedcard">
+  </div>
+  <div class="item">
+    <label for="enable-ai-summary">开启视频AI总结:</label>
+    <input type="checkbox" id="enable-ai-summary">
+  </div>
+  <div class="item">
+    <label for="enable-hot-comment">开启热评:</label>
+    <input type="checkbox" id="enable-hot-comment">
+  </div>
+  <div class="item">
+    <label for="ai-summary-hover-threshold">视频AI总结悬停触发时长（毫秒）:</label>
+    <input type="number" id="ai-summary-hover-threshold">
+  </div>
+  <div class="item">
+    <label for="enable-video-tag">开启视频标签:</label>
+    <input type="checkbox" id="enable-video-tag">
+  </div>
+  <div class="item">
     <label for="enable-word-cloud">使用词云:</label>
     <input type="checkbox" id="enable-word-cloud">
   </div>
   <div class="number-selector item">
-    <label for="min-number">最小字号:</label>
-    <button id="decrement" class="btn btn-primary">-</button><input type="number" id="min-number" value="5" min="5" max="50"><button
-      class="btn btn-primary" id="increment">+</button>
+    <label for="min-number">词云最小字号:</label>
+    <button id="decrement" class="btn btn-change">-</button>
+      <input type="number" id="min-number" value="5" min="5" max="50">
+    <button id="increment" class="btn btn-change">+</button>
     <p class="desc">(小于此设置字号的词将不会显示)</p>
   </div>
-  <div id="status item"></div>
+
+  <hr>
+
+  <div class="item">
+    <label for="enable-ip-label">开启IP地址显示:</label>
+    <input type="checkbox" id="enable-ip-label">
+  </div>
+
+  <hr>
+
+  <div class="item">
+    <label for="enable-tag-color">根据标签修改用户名颜色:</label>
+    <input type="checkbox" id="enable-tag-color">
+    <div>
+      <div id="tag-color-setting-div">
+        <div id="tag-color-setting-display-div">
+        </div>
+
+        <div id="tag-color-setting-input-div" class="tag-color-setting-item">
+          <input type="text" id="tag-color-setting-add-text" placeholder="标签名">
+          <input type="color" id="tag-color-setting-add-color" value="#000000">
+          <svg id="tag-color-setting-add-button" xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 0 512 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2023 Fonticons, Inc.--><path d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="item">
+    <div>
+      <button id="export-note">导出备注</button>
+      <button id="import-note">导入备注</button>
+      <button id="extend-note">添加备注</button>
+    </div>
+  </div>
+
+  <div class="item">
+    <div>
+      <div id="clear-note-button-div">
+        <button id="clear-note">清空备注</button>
+      </div>
+      <div id="clear-note-confirm-div" hidden>
+        <button id="clear-note-cancel">取消清空</button>
+        <button id="clear-note-confirm" class="btn-danger">确认清空</button>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div id="status" class="item"></div>
   <div class="item">
     <button id="save" class="btn btn-primary">保存</button>
+    <button id="report-issue" class="btn btn-primary" style="float: right;">反馈问题</button>
   </div>
   <script src="options.js"></script>
 </body>
-
 </html>

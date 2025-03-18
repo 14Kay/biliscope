@@ -1,51 +1,3 @@
-function numberToDisplay(number) {
-    if (number > 10000) {
-        return `${(number / 10000).toFixed(1)}万`;
-    }
-    return number;
-}
-
-function timestampToDisplay(timestamp) {
-    if (timestamp == null) {
-        return ""
-    }
-    let date = new Date(timestamp * 1000);
-    let timediff = Date.now() / 1000 - timestamp;
-    const hour = 60 * 60;
-    const day = 24 * hour;
-
-    if (timediff < hour) {
-        return "刚刚";
-    } else if (timediff < day) {
-        return `${Math.floor(timediff / hour)}小时前`;
-    } else if (timediff < 30 * day) {
-        return `${Math.floor(timediff / day)}天前`;
-    } else {
-        return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-    }
-}
-
-function secondsToDisplay(sec) {
-    if (!sec) {
-        return 0;
-    }
-
-    function digitToStr(n) {
-        n = Math.floor(n);
-        return n < 10 ? "0" + n : n;
-    }
-
-    sec = Math.floor(sec);
-
-    if (sec < 60) {
-        return `00:${digitToStr(sec)}`;
-    } else if (sec < 60 * 60) {
-        return `${digitToStr(sec / 60)}:${digitToStr(sec % 60)}`;
-    } else {
-        return `${digitToStr(sec / 60 / 60)}:${digitToStr(sec / 60) % 60}:${digitToStr(sec % 60)}`;
-    }
-}
-
 function titleTypeToClass(titleType) {
     if (titleType == 0) {
         return "biliscope-personal-auth-icon";
@@ -68,17 +20,13 @@ function relationDisplay(data) {
         return null;
     }
 
-    if (data["relation"]["attribute"] == 128) {
-        return "已拉黑";
-    }
-
     if (data["be_relation"]["attribute"] == 128) {
         return "已被拉黑";
     }
 
     if (data["relation"]["attribute"] == 0) {
         if (data["be_relation"]["attribute"] == 0) {
-            return null;
+            return "关注";
         } else if (data["be_relation"]["attribute"] == 2) {
             return "关注了你";
         }
@@ -93,24 +41,81 @@ function relationDisplay(data) {
     return null;
 }
 
+function subscribeTimeToDisplay(data) {
+    if (data["relation"] && data["relation"]["mtime"]) {
+        return `关注时间：${timestampToDisplay(data["relation"]["mtime"])}`;
+    } else {
+        return '';
+    }
+}
+
 function relationClass(data) {
     text = relationDisplay(data);
     if (text == null) {
         return "d-none";
-    } else if (text == "已拉黑" || text == "已被拉黑") {
+    } else if (text == "已被拉黑") {
         return "biliscope-relation-black";
-    } else {
+    } else if (text == "关注" || text == "关注了你") {
         return "biliscope-relation-follow";
+    } else if (text == "已关注" || text == "已互粉") {
+        return "biliscope-relation-followed";
     }
+}
+
+function blockDisplay(data) {
+    if (data?.relation?.attribute === undefined) {
+        return null;
+    }
+
+    if (data["relation"]["attribute"] == 128) {
+        return "取消拉黑";
+    } else {
+        return "拉黑";
+    }
+}
+
+function blockClass(data) {
+    const text = blockDisplay(data);
+    if (biliScopeOptions.enableBlockButton && text) {
+        return "biliscope-relation-block";
+    }
+    return "d-none";
+}
+
+function messageClass(data) {
+    if (data?.relation?.attribute == 128 || data?.be_relation?.attribute == 128) {
+        return "d-none";
+    }
+    return "biliscope-relation-message";
+}
+
+function messageLink(data) {
+    return `https://message.bilibili.com/#/whisper/mid${data["mid"]}`;
+}
+
+function noteDataToDisplay(noteData, mid) {
+    if (noteData && noteData[mid]) {
+        return noteData[mid].split("\n", 1)[0];
+    }
+    return "";
 }
 
 function getUserProfileCardDataHTML(data) {
     return `
-        <div class="idc-theme-img" style="background-image: url(&quot;${data["top_photo"]}@100Q.webp&quot;);">
+        <div class="idc-theme-img" ${data["top_photo"] ? `style="background-image: url(&quot;${data["top_photo"]}@100Q.webp&quot;);"`: ''}>
+            <div style="position: absolute; top: 85px; right: 10px">
+                <a><span id="biliscope-follow-button" 
+                         class="biliscope-relation ${relationClass(data)}" 
+                         ${data?.relation?.mtime ? `title="${subscribeTimeToDisplay(data)}"` : ''}>
+                    ${relationDisplay(data)}
+                </span></a>
+                <a><span id="biliscope-block-button" class="biliscope-relation ${blockClass(data)}">${blockDisplay(data)}</span></a>
+                <a href="${messageLink(data)}"><span class="biliscope-relation ${messageClass(data)}">私信</span></a>
+            </div>
         </div>
         <div class="idc-info clearfix">
-            <a class="idc-avatar-container">
-                <img alt="${data["name"]}" src="${data["face"]}@54w_54h_1c.webp" class="idc-avatar">
+            <a class="idc-avatar-container" href="https://space.bilibili.com/${data["mid"]}" target="_blank">
+                <img alt="${data["name"]}" ${data["face"] ? `src="${data["face"]}@54w_54h_1c.webp"` : ''} class="idc-avatar">
                 <div class="${data["live_status"] ? "": "d-none"}">
                     <div class="live-tab">
                         <img src="//s1.hdslb.com/bfs/static/jinkela/space/assets/live.gif" alt="live" class="live-gif">
@@ -122,27 +127,43 @@ function getUserProfileCardDataHTML(data) {
                 </div>
             </a>
             <div class="idc-content h">
-                <div>
-                    <a class="idc-username">
-                        <b title="${data["name"]}" class="idc-uname" style="${data["vip"] ? "color: rgb(251, 114, 153);": "color: #18191C"}">
-                            ${data["name"]}
-                        </b>
-                    </a>
-                    <span class="gender biliscope-icon ${sexToClass(data["sex"])}"></span>
-                    <span class="lv-wrapper">
-                        <span class="lv-img-wrapper" style="position: relative; top: -${data["level"]*12}px">
-                            <img style="height: 132px; vertical-align: middle" src="${chrome.runtime.getURL("img/bililv.svg")}">
+                <div style="white-space: nowrap">
+                    <div id="biliscope-username-wrapper" style="display: inline-block">
+                        <a class="idc-username">
+                            <b title="点击添加备注" class="idc-uname" style="${data["vip"] ? "color: rgb(251, 114, 153);": "color: #18191C"}">
+                                ${data["name"]}
+                            </b>
+                        </a>
+                        <span class="gender biliscope-icon ${sexToClass(data["sex"])}"></span>
+                        <span class="lv-wrapper">
+                            <span class="lv-img-wrapper" style="position: relative; top: -${data["level"]*12}px">
+                                <img style="height: 132px; vertical-align: middle" src="${chrome.runtime.getURL("img/bililv.svg")}">
+                            </span>
                         </span>
-                    </span>
-                    <span class="biliscope-relation ${relationClass(data)}">${relationDisplay(data)}</span>
+                    </div>
                 </div>
-                <div class="idc-meta" style="${noteData && noteData[data["mid"]] ? "": "display: none"}">
-                    <span class="idc-meta-item">${noteData ? noteData[data["mid"]]: ""}</span>
+                <div class="idc-meta" id="biliscope-note-wrapper">
+                    <div class="idc-meta-item"
+                          id="biliscope-card-note-text"
+                          ${noteDataToDisplay(noteData, data["mid"]) ? "": "hidden"}>${noteDataToDisplay(noteData, data["mid"])}</div>
+                    <textarea class="idc-meta-item"
+                              id="biliscope-card-note-textarea"
+                              rows="3"
+                              hidden
+                              maxlength="5000"
+                              placeholder="给up加个备注（手动换行前的内容都将显示在卡片上）\n或者加几个#标签#"
+                              style="resize: vertical; width: 100%">\n${(data["mid"] && noteData[data["mid"]]) || ""}</textarea>
                 </div>
                 <div class="idc-meta">
-                    <span class="idc-meta-item"><data-title>关注</data-title> ${data["following"] || 0}</span>
-                    <span class="idc-meta-item"><data-title>粉丝</data-title> ${numberToDisplay(data["follower"]) || 0}</span>
-                    <span class="idc-meta-item"><data-title>投稿</data-title> ${data["count"] || 0}</span>
+                    <a href="https://space.bilibili.com/${data["mid"]}/fans/follow" target="_blank">
+                        <span class="idc-meta-item"><data-title>关注</data-title> ${data["following"] || 0}</span>
+                    </a>
+                    <a href="https://space.bilibili.com/${data["mid"]}/fans/fans" target="_blank">
+                        <span class="idc-meta-item"><data-title>粉丝</data-title> ${numberToDisplay(data["follower"]) || 0}</span>
+                    </a>
+                    <a href="https://space.bilibili.com/${data["mid"]}/video" target="_blank">
+                        <span class="idc-meta-item"><data-title>投稿</data-title> ${data["count"] || 0}</span>
+                    </a>
                 </div>
                 <div class="idc-meta" style="${data["count"] ? "": "display: none"}">
                     <span class="idc-meta-item"><data-title>近30天投稿数</data-title> ${data["lastMonthVideoCount"] || 0}</span>
@@ -154,9 +175,15 @@ function getUserProfileCardDataHTML(data) {
             </div>
             <div id="biliscope-tag-list">
             </div>
-            <div class="idc-auth-description" style="${data["title"] ? "": "display: none"}">
-                <span style="display: flex">
-                    ${data["title"] ? `<a class="biliscope-auth-icon ${titleTypeToClass(data["title_type"])}"></a>` + data["title"] : ""}
+            <div class="idc-auth-description">
+                <span style="display: ${data["title"] ? "flex": "none"}">
+                    <span class="biliscope-auth-icon ${titleTypeToClass(data["title_type"])}"></span>
+                    ${data["title"]}
+                </span>
+                <span class="biliscope-profession-description" style="display: ${data["profession"] ? "flex": "none"}">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADYAAAA2CAMAAAC7m5rvAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAABFUExURUxpcWFlbV9lbWFlbF9ka2FlbV9nb2FmbF9jb19jbF9fb19kbGFmbV9lbV9mbF9mbWJlbmFlbV9mbGFmbWJnbmBlbGFmbSRGAiYAAAAWdFJOUwC/kN8w3yDvEEAgYJ+AcFCPz6Cvb7D9AeNOAAABvElEQVR42u1Wy7aDIAwU5C1WrS3//6k3UE9zEsB6F901OyGTZCYRGH72TXNe7tqmZDcx+6sgLwGBZqO6AhKpMhE+lbcWPy0n4+BLLVKXhdWdoUJxioSPuue18SShyqSE4csmA0d1hrK31s4t76hehf2YRgMuNNXIKFIgx40tXVaIZ855r40SgTblxfmBQz0yAoTvANBDVDVALHMOM4108Z1smnCVrkD7JNsCwurlU1F8pPTCeRCNigkr45u5dbydRzrNq5wxv2ZCx3fEQYIXV2nBxMmTxpRkB4EngW1AjQtdN8ZAYq6Iw82cGhNgYxzwJjDYJERHh0wlcevDHOSeMYLpwbBIbEIoeljUo1WkRgaoA4qPE7gR2POISpsQ2BQuqHG7kXtx0JCUec2N4UIzmRQRnw0XiufZtFnNgiuuSMkf+cmC7aM/FxMhkJ8swyZ+bKiPv7zgAxjRg6a7ESaaHmSP9rEhq4MXiR0DI3vHa+hfKlwg7FUfpzLK/PfqeFjOgMdMsUoYREJU74IAIPHwIDyvkJuTqTjJRTn4MtNxCUs3nJtpXflXXhnqTh8Y8vrTZBZbFk/v0rvhZ1+0P1TyJPe5FgeZAAAAAElFTkSuQmCC"
+                         class="biliscope-profession-description-icon">
+                    ${data["profession"]}
                 </span>
             </div>
             <div class="idc-auth-description">
@@ -170,7 +197,7 @@ function getUserProfileCardDataHTML(data) {
 }
 
 function getGuardSupportHTML(data) {
-    if (guardInfo == null) {
+    if (guardInfo == null || guardInfo.length === 0) {
         return "";
     }
 
@@ -232,11 +259,25 @@ function getUserProfileCardHTML(data) {
             <div id="biliscope-id-card-data">
                 ${getUserProfileCardDataHTML(data)}
             </div>
-            <div id="word-cloud-canvas-wrapper">
-                <canvas id="word-cloud-canvas" style="width: 100%; height: 0"></canvas>
+            <div id="biliscope-wordcloud-wrapper">
+                <div id="word-cloud-canvas-wrapper" ${biliScopeOptions.enableWordCloud ? "": "hidden"}>
+                    <canvas id="word-cloud-canvas" style="width: 100%; height: 0"></canvas>
+                </div>
+                <div id="word-cloud-toggler" hidden>
+                    <div class="arrow-up">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="12px" viewBox="0 0 512 512" fill="#adadad"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M233.4 105.4c12.5-12.5 32.8-12.5 45.3 0l192 192c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L256 173.3 86.6 342.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l192-192z"/></svg>
+                    </div>
+                    <div class="arrow-down">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="12px" viewBox="0 0 512 512" fill="#adadad"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M233.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L256 338.7 86.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"/></svg>
+                    </div>
+                </div>
             </div>
         </div>
     `
+}
+
+function saveOptions() {
+    chrome.storage.sync.set(biliScopeOptions);
 }
 
 function UserProfileCard() {
@@ -246,7 +287,10 @@ function UserProfileCard() {
     this.cursorY = 0;
     this.target = null;
     this.enabled = false;
+    this.valid = false;
     this.wordCloud = null;
+    this.fixed = false;
+    this.cursorInside = false;
     this.el = document.createElement("div");
     this.el.style.position = "absolute";
     this.el.style.display = "none";
@@ -262,9 +306,16 @@ function UserProfileCard() {
     this.disable();
 
     document.body.appendChild(this.el);
+
+    this.initEvents();
 }
 
 UserProfileCard.prototype.disable = function() {
+    if (this.fixed) {
+        return false;
+    }
+
+    this.valid = false;
     this.userId = null;
     this.enabled = false;
     this.data = {};
@@ -277,30 +328,15 @@ UserProfileCard.prototype.disable = function() {
         }
         this.idCardObserver.disconnect();
     }
+    return true;
 }
 
 UserProfileCard.prototype.enable = function() {
     if (!this.enabled) {
         this.enabled = true;
-        this.idCardObserver.observe(document.body, {
-            "childList": true,
-            "subtree": true
-        })
         return true;
     }
     return false;
-}
-
-UserProfileCard.prototype.checkTargetValid = function(target) {
-    if (this.enabled && this.target) {
-        while (target) {
-            if (target == this.target) {
-                return;
-            }
-            target = target.parentNode;
-        }
-        this.disable();
-    }
 }
 
 UserProfileCard.prototype.clearOriginalCard = function() {
@@ -308,58 +344,150 @@ UserProfileCard.prototype.clearOriginalCard = function() {
         document.getElementById("id-card").remove();
     }
 
-    for (let card of document.getElementsByClassName("user-card")) {
-        card.remove();
+    for (const card of document.querySelectorAll(".user-card, .card-loaded, .bili-user-profile, bili-user-profile")) {
+        card.hidden = true;
+        card.style.display = "none";
+        card.style.visibility = "hidden";
     }
+}
 
-    for (let card of document.getElementsByClassName("card-loaded")) {
-        card.remove();
-    }
+UserProfileCard.prototype.initEvents = function() {
+    let wordCloudCanvasWrapper = document.getElementById("word-cloud-canvas-wrapper");
+    let wordCloudWrapper = document.getElementById("biliscope-wordcloud-wrapper");
+    let arrowUp = wordCloudWrapper.getElementsByClassName("arrow-up")[0];
+    let arrowDown = wordCloudWrapper.getElementsByClassName("arrow-down")[0];
+
+    wordCloudWrapper.addEventListener("mouseenter", (ev) => {
+        document.getElementById("word-cloud-toggler").hidden = false;
+        if (biliScopeOptions.enableWordCloud) {
+            arrowUp.hidden = false;
+            arrowDown.hidden = true;
+        } else {
+            arrowUp.hidden = true;
+            arrowDown.hidden = false;
+        }
+    });
+
+    wordCloudWrapper.addEventListener("mouseleave", (ev) => {
+        document.getElementById("word-cloud-toggler").hidden = true;
+    });
+
+    arrowUp.addEventListener("click", (ev) => {
+        biliScopeOptions.enableWordCloud = false;
+        wordCloudCanvasWrapper.hidden = true;
+        saveOptions();
+        arrowUp.hidden = true;
+        arrowDown.hidden = false;
+    });
+
+    arrowDown.addEventListener("click", (ev) => {
+        let canvas = document.getElementById("word-cloud-canvas");
+        biliScopeOptions.enableWordCloud = true;
+        wordCloudCanvasWrapper.hidden = false;
+        saveOptions();
+        arrowUp.hidden = false;
+        arrowDown.hidden = true;
+        this.drawWordCloud(canvas);
+    });
 }
 
 UserProfileCard.prototype.updateUserId = function(userId) {
+    let updated = this.userId != userId;
     this.userId = userId;
+    return updated;
 }
 
 UserProfileCard.prototype.updateCursor = function(cursorX, cursorY) {
-    const cursorPadding = 10;
-    const windowPadding = 20;
-
     this.cursorX = cursorX;
     this.cursorY = cursorY;
+    const targetBounding = this.target
+        ? this.target.getBoundingClientRect()
+        : {left: cursorX, right: cursorX, top: cursorY, bottom: cursorY};
 
-    if (this.el) {
-        let width = this.el.scrollWidth;
-        let height = this.el.scrollHeight;
+    const href = window.location.href;
 
-        if (this.cursorX + width + windowPadding > window.scrollX + window.innerWidth) {
-            // Will overflow to the right, put it on the left
-            this.el.style.left = `${this.cursorX - cursorPadding - width}px`;
-        } else {
-            this.el.style.left = `${this.cursorX + cursorPadding}px`;
-        }
+    if (href.startsWith(BILIBILI_DYNAMIC_URL) ||
+        href.startsWith(BILIBILI_DYNAMIC_DETAIL_URL)) {
+        // 动态界面
+        displayElOutsideTarget(
+            this.el,
+            targetBounding,
+            ['left', 'bottom', 'right', 'top', 'default']
+        );
+    } else {
+        displayElOutsideTarget(
+            this.el,
+            targetBounding,
+            ['right', 'left']
+        );
 
-        if (this.cursorY + height + windowPadding > window.scrollY + window.innerHeight) {
-            // Will overflow to the bottom, put it on the top
-            if (this.cursorY - windowPadding - height < window.scrollY) {
-                // Can't fit on top either, put it in the middle
-                this.el.style.top = `${window.scrollY + (window.innerHeight - height) / 2}px`;
-            } else {
-                this.el.style.top = `${this.cursorY - cursorPadding - height}px`;
-            }
-        } else {
-            this.el.style.top = `${this.cursorY + cursorPadding}px`;
-        }
     }
 }
 
 UserProfileCard.prototype.updateTarget = function(target) {
+    if (target != this.target) {
+        // Calculate z-index for the card
+        let node = target
+        let zIndex = 1002;
+        while (node && node != document) {
+            if (node instanceof ShadowRoot) {
+                node = node.host;
+            }
+            let containerIndex = window.getComputedStyle(node).getPropertyValue("z-index");
+            if (containerIndex && containerIndex != "auto" && containerIndex > zIndex) {
+                zIndex = containerIndex;
+            }
+            node = node.parentNode;
+        } 
+        this.el.style.zIndex = zIndex + 1;
+    }
+
     this.target = target;
-    upc = this
-    this.target.addEventListener("mouseleave", function leaveHandle(ev) {
-        upc.disable();
-        this.removeEventListener("mouseleave", leaveHandle);
-    })
+    this.setLeaveEvent();
+}
+
+UserProfileCard.prototype.setLeaveEvent = function() {
+    let validTargets = [this.el, this.target];
+
+    // The UI lives directly under document so switching to the UI will trigger
+    // the leave event. We need to dispatch the event to the popover to prevent
+    // the popover from disappearing.
+    const dispatchToPopover = (event) => {
+        const popover = this.target.closest(".v-popover");
+        popover?.dispatchEvent(new Event(event));
+    }
+
+    this.leaveCallback = (ev) => {
+        if (this.disable()) {
+            for (let target of validTargets) {
+                target.removeEventListener("mouseleave", this.disableDebounce);
+                target.removeEventListener("mouseenter", this.enterCallback);
+            }
+            if (ev.target == this.el) {
+                dispatchToPopover("mouseleave");
+            }
+        }
+    }
+
+    this.enterCallback = (ev) => {
+        clearTimeout(this.disableDebounce.timer);
+        if (ev.target == this.el) {
+            dispatchToPopover("mouseenter");
+        }
+        this.cursorInside = true;
+    }
+
+    this.disableDebounce = (ev) => {
+        this.cursorInside = false;
+        this.disableDebounce.timer = setTimeout(() => {
+            this.leaveCallback(ev);
+        }, 400);
+    }
+
+    for (let target of validTargets) {
+        target.addEventListener("mouseleave", this.disableDebounce);
+        target.addEventListener("mouseenter", this.enterCallback);
+    }
 }
 
 UserProfileCard.prototype.wordCloudMaxCount = function() {
@@ -368,17 +496,175 @@ UserProfileCard.prototype.wordCloudMaxCount = function() {
 
 UserProfileCard.prototype.drawVideoTags = function() {
     let tagList = document.getElementById("biliscope-tag-list");
+    let groupTagIds = [];
+    let noteTags = getTags(this.data["mid"]);
     tagList.innerHTML = "";
-    if (this.data["video_type"]) {
+
+    if (this.data?.relation?.tag) {
+        groupTagIds = this.data["relation"]["tag"].filter(tagId => biliTags[tagId] !== undefined)
+    }
+
+    if (this.data["mid"] && groupTagIds.length + noteTags.length > 0) {
+        for (let tagId of groupTagIds) {
+            let tag = biliTags[tagId];
+            let a = document.createElement("a");
+            let el = document.createElement("span");
+            el.className = "biliscope-badge biliscope-badge-group-tag";
+            el.innerHTML = tag;
+            a.href = `${BILIBILI_SPACE_URL}/${myMid}/fans/follow?tagid=${tagId}`;
+            a.appendChild(el);
+            tagList.appendChild(a);
+        }
+        for (let tag of noteTags) {
+            let a = document.createElement("a");
+            let el = document.createElement("span");
+            el.className = "biliscope-badge biliscope-badge-note-tag";
+            el.innerHTML = tag;
+            if (tagColors[tag]) {
+                el.style.backgroundColor = tagColors[tag];
+            }
+            a.href = `${BILIBILI_SEARCH_URL}/upuser?keyword=%23${encodeURIComponent(tag)}`;
+            a.appendChild(el);
+            tagList.appendChild(a);
+        }
+    } else if (this.data["video_type"]) {
         for (let d of this.data["video_type"]) {
             if (BILIBILI_VIDEO_TYPE_MAP[d[0]]) {
                 let el = document.createElement("span");
-                el.className = "biliscope-badge";
+                let a = document.createElement("a");
+                el.className = "biliscope-badge biliscope-badge-video-tag";
                 el.innerHTML = BILIBILI_VIDEO_TYPE_MAP[d[0]];
-                tagList.appendChild(el);
+                a.href = `https://www.bilibili.com/v/${BILIBILI_VIDEO_TYPE_LINK[d[0]]}`;
+                a.appendChild(el);
+                tagList.appendChild(a);
             }
         }
     }
+}
+
+UserProfileCard.prototype.setupTriggers = function() {
+    let userWrapper = document.getElementById("biliscope-username-wrapper");
+    let text = document.getElementById("biliscope-card-note-text");
+    let textarea = document.getElementById("biliscope-card-note-textarea");
+    let followButton = document.getElementById("biliscope-follow-button");
+    let blockButton = document.getElementById("biliscope-block-button");
+
+    // This event uses mousedown because the event trigger sequence click event will be later than blur
+    userWrapper.addEventListener("mousedown", (ev) => {
+        // Blur is triggered by the default behavior of mousedown, so if there is no preventDefault here, it will be blurred immediately and the input box will never be opened
+        ev.preventDefault();
+
+        // not left-click
+        if (ev.button !== 0) {
+            return;
+        }
+
+        if (!textarea.hidden) {
+            textarea.blur();
+            return;
+        }
+
+        text.hidden = true;
+        textarea.hidden = false;
+        textarea.focus();
+        this.fixed = true;
+    });
+
+    text.addEventListener("click", (ev) => {
+        text.hidden = true;
+        textarea.hidden = false;
+        textarea.focus();
+        this.fixed = true;
+    });
+
+    textarea.addEventListener("blur", (ev) => {
+        let mid = this.data["mid"];
+        // if the value is empty, delete the key
+        if (mid) {
+            if (textarea.value == "") {
+                delete noteData[mid];
+            } else {
+                noteData[mid] = textarea.value;
+            }
+            text.innerHTML = noteDataToDisplay(noteData, mid);
+            chrome.storage.local.set({
+                noteData: noteData
+            });
+            this.drawVideoTags();
+        }
+        if (text.innerHTML == "") {
+            text.hidden = true;
+        } else {
+            text.hidden = false;
+        }
+        textarea.hidden = true;
+        this.fixed = false;
+        if (!this.cursorInside) {
+            this.leaveCallback();
+        }
+    });
+
+    followButton.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+
+        let followAction = null;
+        if (ev.target.classList.contains("biliscope-relation-follow")) {
+            // Follow
+            followAction = 1;
+        } else if (ev.target.classList.contains("biliscope-relation-followed")) {
+            // Unfollow
+            followAction = 2;
+        }
+
+        if (followAction) {
+            biliPost("https://api.bilibili.com/x/relation/modify", {
+                fid: this.data["mid"],
+                act: followAction,
+                re_src: 11
+            })
+            .then((data) => {
+                if (data["code"] == 0) {
+                    updateRelation(this.userId, (data) => this.updateData(data));
+                }
+            });
+        }
+    });
+
+    blockButton.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+
+        const needBlock = blockButton.innerText == "拉黑";
+
+        biliPost("https://api.bilibili.com/x/relation/modify", {
+            fid: this.data["mid"],
+            act: needBlock ? 5 : 6,
+            re_src: 11
+        })
+        .then((data) => {
+            if (data["code"] == 0) {
+                updateRelation(this.userId, (data) => this.updateData(data));
+            }
+        });
+    });
+}
+
+UserProfileCard.prototype.drawWordCloud = function(canvas) {
+    const idCard = document.getElementById("biliscope-id-card");
+    const cardWidth = parseInt(window.getComputedStyle(idCard).width.replace("px", ""));
+
+    canvas.style.height = `${cardWidth / 2}px`;
+    canvas.width = cardWidth * window.devicePixelRatio;
+    canvas.height = cardWidth / 2 * window.devicePixelRatio;
+
+    canvas.parentNode.classList.add("biliscope-canvas-show");
+
+    WordCloud(canvas, {
+        list: JSON.parse(JSON.stringify(this.data["wordcloud"])),
+        backgroundColor: "transparent",
+        weightFactor: 100 / this.wordCloudMaxCount() * window.devicePixelRatio,
+        shrinkToFit: true,
+        minSize: biliScopeOptions.minSize * window.devicePixelRatio
+    });
 }
 
 UserProfileCard.prototype.updateData = function (data) {
@@ -393,6 +679,11 @@ UserProfileCard.prototype.updateData = function (data) {
         this.data["follower"] = d["data"]["follower"];
         this.data["following"] = d["data"]["following"];
     } else if (data["api"] == "info") {
+        if (d["code"] == -404) {
+            this.valid = false;
+            return;
+        }
+        this.valid = true;
         this.data["mid"] = d["data"]["mid"];
         this.data["name"] = d["data"]["name"];
         this.data["sex"] = d["data"]["sex"];
@@ -404,6 +695,9 @@ UserProfileCard.prototype.updateData = function (data) {
         this.data["live_status"] = d["data"]["live_room"] ? d["data"]["live_room"]["liveStatus"]: 0;
         this.data["vip"] = d["data"]["vip"]["status"];
         this.data["top_photo"] = d["data"]["top_photo"].replace("http://", "https://");
+        this.data["profession"] = d["data"]["profession"]["is_show"]
+            ? `${d["data"]["profession"]["title"]} ${d["data"]["profession"]["department"]}`
+            : "";
     } else if (data["api"] == "relation") {
         this.data["relation"] = d["data"]["relation"];
         this.data["be_relation"] = d["data"]["be_relation"];
@@ -422,19 +716,7 @@ UserProfileCard.prototype.updateData = function (data) {
     if (data["api"] == "wordcloud") {
         let canvas = document.getElementById("word-cloud-canvas");
         if (this.data["wordcloud"].length > 0) {
-            canvas.style.height = `${canvas.offsetWidth / 2}px`;
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-
-            canvas.parentNode.classList.add("biliscope-canvas-show");
-
-            WordCloud(canvas, {
-                list: JSON.parse(JSON.stringify(this.data["wordcloud"])),
-                backgroundColor: "transparent",
-                weightFactor: 100 / this.wordCloudMaxCount(),
-                shrinkToFit: true,
-                minSize: biliScopeOptions.minSize
-            });
+            this.drawWordCloud(canvas);
             this.drawVideoTags();
         } else {
             canvas.style.height = "0px";
@@ -443,10 +725,15 @@ UserProfileCard.prototype.updateData = function (data) {
     } else if (this.data['name']) {
         // wait until name is ready
         document.getElementById("biliscope-id-card-data").innerHTML = getUserProfileCardDataHTML(this.data);
+        this.setupTriggers();
         this.drawVideoTags();
     }
 
-    if (this.enabled && this.el && this.el.style.display != "flex") {
+    if (this.enabled && this.valid && this.el && this.el.style.display != "flex") {
+        this.idCardObserver.observe(document.body, {
+            "childList": true,
+            "subtree": true
+        })
         this.clearOriginalCard();
         this.el.style.display = "flex";
     }
@@ -456,15 +743,5 @@ UserProfileCard.prototype.updateData = function (data) {
 
 var guardInfo = null;
 
-userProfileCard = new UserProfileCard();
-
-getGuardInfo(6726252, 245645656).then((data) => {
-    guardInfo = data;
-    // Shuffle guardInfo
-    for (let i = 0; i < guardInfo.length; i++) {
-        let j = Math.floor(Math.random() * guardInfo.length);
-        let t = guardInfo[i];
-        guardInfo[i] = guardInfo[j];
-        guardInfo[j] = t;
-    }
-});
+let biliTags = {};
+let myMid = null;

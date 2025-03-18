@@ -1,93 +1,87 @@
-document.addEventListener("mouseover", showProfileDebounce);
-document.addEventListener("mousemove", (ev) => userProfileCard.updateCursor(ev.pageX, ev.pageY));
-
-biliScopeOptions = null;
-
-chrome.storage.sync.get({
-    enableWordCloud: true,
-    minSize: 5
-}, function(items) {
-    biliScopeOptions = items;
-});
-
-function getUserIdFromLink(s) {
-    let regex = /.*?bilibili.com\/([0-9]*)(\/dynamic)?([^\/]*|\/|\/\?.*)$/;
-    let userId = null;
-
-    if (s && s.match(regex)) {
-        return s.match(regex)[1];
-    }
-    return userId;
-}
-
-async function getUserId(userLink) {
-    let userId = null;
-
-    if (window.location.href.startsWith(BILIBILI_POPULAR_URL)) {
-        // popular page, requires special treatment
-        let node = userLink;
-        while (node = node.parentNode) {
-            if (node.classList.contains("video-card")) {
-                let videoLink = node.getElementsByTagName("a")[0];
-                userId = await getUserIdFromVideoLink(videoLink.href);
-                break;
-            }
-        }
-    } else {
-        userId = getUserIdFromLink(userLink.href);
-    }
-
-    if (userId) {
-        return userId;
-    }
-
-    return null;
-}
-
 function getTarget(target) {
-    if (window.location.href.startsWith(BILIBILI_POPULAR_URL)) {
-        // popular page, requires special treatment
-        for (let userLink of [target, target.parentNode]) {
-            if (userLink.classList && userLink.classList.contains("up-name__text")) {
-                return userLink;
-            }
+    let maxDepth = 5;
+    el = target;
+    while (el && maxDepth-- >= 0 && el.getAttribute) {
+        if (el.getAttribute("biliscope-userid")) {
+            return {"type": "user", "target": el};
+        } else if (el.getAttribute("data-user-profile-id")) {
+            return {"type": "user", "target": el};
+        } else if (el.getAttribute("biliscope-videoid")) {
+            return {"type": "video", "target": el};
         }
-    } else {
-        for (let userLink of [target, target.parentNode, target.parentNode.parentNode]) {
-            if (userLink && userLink.tagName == "A" && userLink.href.startsWith(BILIBILI_SPACE_URL)) {
-                return userLink;
-            }
-        }
+        el = el.parentNode;
     }
-
     return null;
 }
 
-function showProfile(event) {
-    let target = getTarget(event.target);
-
-    if (target && userProfileCard.enable()) {
-        userProfileCard.updateCursor(event.pageX, event.pageY);
-        userProfileCard.updateTarget(target);
-        getUserId(target).then((userId) => {
-            if (userId) {
-                if (userId != userProfileCard.userId) {
-                    userProfileCard.updateUserId(userId);
-                    updateUserInfo(userId, (data) => userProfileCard.updateData(data));
-                }
-            } else {
-                userProfileCard.disable();
+function showProfile(event, targetData) {
+    if (targetData["type"] == "user") {
+        if (biliScopeOptions.enableUpCard && userProfileCard && userProfileCard.enable()) {
+            let target = targetData["target"];
+            let userId = target.getAttribute("biliscope-userid")
+                || target.getAttribute("data-user-profile-id");
+            let updated = userProfileCard.updateUserId(userId);
+            userProfileCard.updateCursor(event.clientX, event.clientY);
+            userProfileCard.updateTarget(target);
+            if (updated) {
+                updateUserInfo(userId, (data) => userProfileCard.updateData(data));
             }
-        })
-    } else {
-        userProfileCard.checkTargetValid(event.target);
+        }
+    } else if (targetData["type"] == "video") {
+        let videoInfoConsumer = [];
+        const target = targetData["target"];
+        const videoId = target.getAttribute("biliscope-videoid");
+
+        if (biliScopeOptions.enableVideoTag && videoTagManager) {
+            const updated = videoTagManager.updateTarget(target);
+            videoTagManager.updateVideoId(videoId);
+            if (updated) {
+                videoInfoConsumer.push(videoTagManager);
+            }
+        }
+
+        if (biliScopeOptions.enableAiSummary && videoProfileCard && videoProfileCard.enable()) {
+            const updated = videoProfileCard.updateVideoId(videoId);
+            videoProfileCard.updateTarget(target);
+            videoProfileCard.updatePosition();
+            if (updated) {
+                videoInfoConsumer.push(videoProfileCard);
+            }
+        }
+
+        if (videoInfoConsumer.length) {
+            updateVideoInfo(videoId, (data) => {
+                for (let consumer of videoInfoConsumer) {
+                    consumer.updateData(data);
+                }
+            });
+        }
     }
 }
 
 function showProfileDebounce(event) {
     clearTimeout(showProfileDebounce.timer);
-    event.target.addEventListener("mouseout", () => clearTimeout(showProfileDebounce.timer));
+    let targetData = getTarget(event.target);
+    if (!targetData) {
+        return;
+    }
+
+    let target = targetData["target"];
+    let type = targetData["type"];
+    let debounceTime = 0;
+
+    switch (type) {
+        case "user":
+            debounceTime = 300;
+            break;
+        case "video":
+            debounceTime = biliScopeOptions.aiSummaryHoverThreshold;
+            break;
+    }
+
+    target.addEventListener("mouseout", () => clearTimeout(showProfileDebounce.timer));
+
     showProfileDebounce.timer = setTimeout(() => {
-        showProfile(event)
-    }, 200);
+        showProfile(event, targetData);
+    }, debounceTime);
 }
